@@ -27,14 +27,3 @@ class Grille():
 	def hightestTile(self):
 		#TODO maxence
 		return 0
-
-#--- Fall functions  TODO yanis/maxence
-
-	def right(self): # fall on right
-		print("right")
-	def left(self): # fall on left
-		return
-	def up(self): # fall on top
-		return
-	def down(self): # fall on bottom
-		return

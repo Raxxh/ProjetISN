@@ -3,30 +3,48 @@ import Tile
 import sys
 import random
 
+def coord2px(x, y):
+	return (353+155*x,16+155*y)
+
 def display(fallTime = 0):
-	# needs test but should work
 	screen.blit(backgroundImg,(0,0))
 	x = 0
 	while x < 4 :
 		y = 0
 		while y < 4 :
 			if tiles[x][y] != None :
-				tiles[x][y].display(screen, tiles[x][y].coord2px(x,y)) # need to calc real X and Y
+				tiles[x][y].display(screen, coord2px(x,y), fallTime) # need to calc real X and Y
 			y += 1
 		x += 1
 
+	if won():
+		screen.blit(wonImg, (0,0))
+
+	displayText(str(score[0]), (1025,200))
 	pygame.display.flip()
 
+def displayText(text, pos):
+	label = myfont.render(text, 1, (0,0,0))
+	screen.blit(label, pos)
+
 def won():
-	#TODO maxence
-	return
+	for x in range(0,4):
+		for y in range(0,4):
+			if (tiles[x][y] != None):
+				if (tiles[x][y].getValue() >= 2048):
+					return True
+	return False
 
 def loose():
-	#TODO
-	return
-
-def fusion(t1, t2):
-	return None
+	print("LOST")
+	display()
+	screen.blit(pygame.image.load("../img/lost.png"), (0,0))
+	pygame.display.flip()
+	# TODO : aff les scores
+	while True:
+		event = pygame.event.poll()
+		if event.type == pygame.QUIT:
+			sys.exit()
 
 def newRandomTile():
 	# random.randrange(0,4) => 0,1,2,3
@@ -41,30 +59,25 @@ def newRandomTile():
 	else :
 		tiles[x][y] = Tile.Tile(2)
 
-def debugGrid():
-	debug = ""
-	y = 0
-	while y < 4 :
-		x = 0
-		s=""
-		while x < 4 :
-			s += " "
-			debug += "y: " + str(y) + ", x: " + str(x) + " :" + str(tiles[x][y])
-			if tiles[x][y] != None :
-				s += str(tiles[x][y].getValue())
-			else:
-				s += "n"
-			x += 1
-			debug+="\n"
-		print(s)
-		y += 1
-	print("======")
-	print(debug)
+	for x in range(0,4):
+		for y in range(0,4):
+			if ( tiles[x][y] == None):
+				return
+	# GRILLE COMPLETE, CHECK LOOSE
+	for x in range(0,3):
+		for y in range(0,4):
+			if (tiles[x][y].getValue() == tiles[x+1][y].getValue()):
+				return
+	for x in range(0,4):
+		for y in range(0,3):
+			if (tiles[x][y].getValue() == tiles[x][y+1].getValue()):
+				return
+	loose()
 
 #--- Fall functions  TODO yanis/maxence
 """
-Fonctionnement : Pour chaque tile, calcule l'écart entre la pos finale et initiale
-et la fait tomber à une certaine vitesse pour que touts les tiles arrivent
+Fonctionnement : Pour chaque tuile, calcule l'écart entre la pos finale et initiale
+et la fait tomber à une certaine vitesse pour que tous les tuiles arrivent
 en même temps.
 Puis, on affiche directement la nouvelle grille
 /!\
@@ -73,129 +86,153 @@ d'arret individuel
 En fait nn c'ests chiant aussi
 re à la méthode prévue
 """
-def getFallDistance(arg): # a tester rapid, devrait être bon
-	last = None
-	justFused = False
+def getFallDistance(arg):
 	result = 0
-	for tile in arg :
-		if (tile != last) and (tile != None) and (not justFused):
+	last = None
+	for tile in arg:
+		if (tile == None):
 			result += 1
-			justFused = True
+		elif (last == None):
+			last = tile
+		elif (tile.getValue() == last.getValue()):
+			result += 1
+			last = None
 		else:
-			justFused = False
-		last = tile 
+			last = tile
 	return result
 
-def checkTileStop(coord, direction):
-	# check if the tile should stop falling
-	tileToCheck = None
-	if ( direction == "right"):
-		tileToCheck = tiles[x + 1][y]
-	if ( direction == "left"):
-		tileToCheck = tiles[x - 1][y]
-	if ( direction == "up"):
-		tileToCheck = tiles[x][y + 1]
-	if ( direction == "down"):
-		tileToCheck = tiles[x][y - 1]
+def getTileList():
+	result = []
+	for x in range(0,4):
+		for y in range(0,4):
+			if tiles[x][y] != None:
+				result.append(tiles[x][y])
+	return result
 
-	if( tileToCheck == None):
-		return False
-	return tiles[x][y].getValue() != tileToCheck.getValue()
+def setLastGrid(grid):
+	for x in range(0, 4):
+		for y in range(0,4):
+			lastGrid[x][y] = grid[x][y]
 
-def updateGridWhileFalling(before, after):
-	#TODO , px2coord a tester avant !!
-	return
+def setGrid(grid, pos, t):
+	grid[pos[0]][pos[1]] = t
 
-def	checkFusion(coord, direction):
-	return False # TODO
+def getGrid(grid, pos):
+	return grid[pos[0]][pos[1]]
+
+def setTiles(grid):
+	x = 0
+	while x < 4:
+		y = 0
+		while y < 4:
+			tiles[x][y] = grid[x][y]
+			y += 1
+		x += 1
 
 def fall(direction):
-	#--- gen de la vitesse individuel
-	"""	speed = 1
-	tileOnWay = []
+	speed = 25
+	tilesOnWay = []
+	newList = [[None for x in range(4)] for y in range(4)]
+	liste = getTileList()
+	newScore = score[0]
+
 	i = 0
 	x = 0
-	while x < 4 : # revoir la logique, 2 diff boucles, une x : doite/gauche, un y : haut/bas
-		y = 0
-		while y < 4 : 
-			if tiles[x][y] != None :
-				if (direction == "right"): # FALLING RIGHT
-					i = x + 1
-					while i < 3 :
-						if tiles[x+i][y] != None :
-							tileOnWay.append(tiles[x+i][y])
-							i += 1
-					dirVect = (speed*getFallDistance(tileOnWay),0)
-
-				if (direction == "left"): # FALLING LEFT
-					i = x - 1
-					while i >= 0 :
-						if tiles[x-i][y] != None :
-							tileOnWay.append(tiles[x-i][y])
-						i -= 1
-					dirVect = (-speed*getFallDistance(tileOnWay),0)
-
-				if (direction == "down"): # FALLING DOWN
-					i = y + 1
-					while i < 3 :
-						if tiles[x][y+i] != None :
-							tileOnWay.append(tiles[x][y+i])
-						i += 1
-					dirVect = (0,speed*getFallDistance(tileOnWay))
-
-				if (direction == "up"): # FALLING LEFT
-					i = y - 1
-					while i >= 0 :
-						if tiles[x][y-i] != None :
-							tileOnWay.append(tiles[x][y-i])
-						i -= 1
-					dirVect = (0,-speed*getFallDistance(tileOnWay))
-
-				tiles[x][y].setFallPosMod(dirVect)
-			y += 1
-		x += 1 # NEED TESTS !!!!! 
-
-	time = 0 # TODO : use real system time
-	while time < 1/speed : # 1/speed ??
-		display(time)
-		time += 1
-	"""
-
-	#--- VITESSE CONSTANTE
-	#todo
 	
-	for a in tiles:
-		for b in a:
-			if (b != None):
-				b.isFalling(True)
-	speed = 1
-
-	if (direction == "right"):
-		x = 3
-		y = 0
-		while (y < 4):
-			while (x >= 0 ):
-				if (tiles[x][y] == None or not tiles[x][y].isFalling()):
+	if direction == "right":
+		for x in range(0,4):
+			for y in range(0,4):
+				if tiles[x][y] == None:
 					continue
-				if (checkTileStop(tiles[x][y].coord2px(x,y), "right")):
-					tiles[x][y].isFalling(False)
-				else:
-					tiles[x][y].setFallPosModRelative((1,0))
-				checkFusion(tiles[x,y].coord2px(x,y), "right")
-				updateGridWhileFalling((x,y), tiles[x][y].coord2px(x,y))
-				x -= 1
-			y += 1
-	return
+				tilesOnWay = []
+				for i in range(x,4):
+					tilesOnWay.append(tiles[i][y])
+
+				tiles[x][y].finalPos((x + getFallDistance(tilesOnWay), y))
+				tiles[x][y].setSpeed((getFallDistance(tilesOnWay), 0))
+
+	if direction == "down":
+		for x in range(0,4):
+			for y in range(0,4):
+				if tiles[x][y] == None:
+					continue
+				tilesOnWay = []
+				for i in range(y,4):
+					tilesOnWay.append(tiles[x][i])
+
+				tiles[x][y].finalPos((x, y + getFallDistance(tilesOnWay)))
+				tiles[x][y].setSpeed((0, getFallDistance(tilesOnWay)))
+
+	if direction == "left":
+		for x in range(3,-1,-1):
+			for y in range(0,4):
+				if tiles[x][y] == None:
+					continue
+				tilesOnWay = []
+				for i in range(0,x+1):
+					tilesOnWay.append(tiles[i][y])
+
+				tiles[x][y].finalPos((x - getFallDistance(tilesOnWay), y))
+				tiles[x][y].setSpeed((-getFallDistance(tilesOnWay), 0))
+
+	if direction == "up":
+		for x in range(0,4):
+			for y in range(3,-1,-1):
+				if tiles[x][y] == None:
+					continue
+				tilesOnWay = []
+				for i in range(0,y+1):
+					tilesOnWay.append(tiles[x][i])
+
+				tiles[x][y].finalPos((x, y - getFallDistance(tilesOnWay)))
+				tiles[x][y].setSpeed((0, -getFallDistance(tilesOnWay)))
+
+	lastScore[0] = score[0]
+	for t in liste:
+		if (getGrid(newList, t.finalPos()) != None):
+			if (getGrid(newList, t.finalPos()).getValue() == t.getValue()):
+				setGrid(newList, t.finalPos(), Tile.Tile(t.getValue() * 2))
+				newScore += t.getValue() * 2
+			else:
+				continue
+		else:
+			setGrid(newList, t.finalPos(), t)
+
+	if ( newList == tiles): # mouvement interdit
+		return False
+
+	setLastGrid(tiles)
+
+	time = 1
+	while time < 155 : 
+		display(time)
+		time += speed
 
 
-def right(): # fall on right
-	fall("right")
-def left(): # fall on left
-	fall("left")
-def up(): # fall on top
-	fall("up")
-def down(): # fall on bottom
-	fall("down")
+	setTiles(newList)
+	score[0] = newScore
+	return True
+
+
+def right():
+	return fall("right")
+def left():
+	return fall("left")
+def up():
+	return fall("up")
+def down():
+	return fall("down")
+
+def NewGame():
+	setTiles([[None for x in range(4)] for y in range(4)])
+	score = 0
+	return True
+	
+def Back():
+	setTiles(lastGrid)
+	score[0] = lastScore[0]
+	display()
+	return False
 
 def play():
 	keyEvents = {
@@ -203,6 +240,8 @@ def play():
 					274:down,
 					276:left,
 					275:right,
+					13:NewGame,
+					8:Back
 				}
 	while True:
 		event = pygame.event.poll()
@@ -210,24 +249,31 @@ def play():
 			sys.exit()
 		if event.type == pygame.KEYDOWN:
 			if event.key in keyEvents:
-				keyEvents[event.key]()
-				return
+				return keyEvents[event.key]()
+				
 
 ################### DEBUT #######################
 
 pygame.init()
 width, height = 1152,648
+
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption('2048')
+myfont = pygame.font.SysFont("monospace", 30)
 
+wonImg = pygame.image.load("../img/won.png")
 backgroundImg = pygame.image.load("../img/background.png")
 tiles = [[None for x in range(4)] for y in range(4)]
+lastGrid = [[None for x in range(4)] for y in range(4)]
+score = [0]
+lastScore = [0]
 
 if (not pygame.display):
 	print("Error during window creation")
 
 # MAIN LOOP #
-while not won() :
+while True :
 	newRandomTile()
 	display()
-	play()
+	while not play():
+		pass
