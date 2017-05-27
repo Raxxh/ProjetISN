@@ -1,12 +1,31 @@
-import pygame
-import Tile
-import sys
-import random
+# Imports
+import pygame 	# graphismes
+import Tile 	# tuiles
+import sys 		# sys.exit()
+import random 	# gen de nouvelles tuiles
+import time 	# temps
 
 def coord2px(x, y):
+	""" Converti les coordonnées du tableau en pixel """
 	return (353+155*x,16+155*y)
 
+def getTimeStr():
+	""" Retourne le temps a afficher """
+	timeNow = time.time() - GameBeginTime[0]
+	
+	hours = int(timeNow // 3600)
+	mint = int(timeNow // 60)
+	sec = int(timeNow % 60)
+
+	if sec < 10:
+		sec = '0' + str(sec)
+	if mint < 10:
+		mint = '0' + str(mint)
+
+	return str(hours) + ":" + str(mint) + ":" + str(sec)
+
 def display(fallTime = 0):
+	""" Affiche le tout en fonction du temps de chute """
 	screen.blit(backgroundImg,(0,0))
 	x = 0
 	while x < 4 :
@@ -20,35 +39,40 @@ def display(fallTime = 0):
 	if won():
 		screen.blit(wonImg, (0,0))
 
+	# Score et Temps
 	displayText(str(score[0]), (1025,200))
+	displayText(getTimeStr(), (1000, 300))
 	pygame.display.flip()
 
 def displayText(text, pos):
+	""" affiche du texte au coordonnées indiquée """
 	label = myfont.render(text, 1, (0,0,0))
 	screen.blit(label, pos)
 
 def won():
-	for x in range(0,4):
-		for y in range(0,4):
-			if (tiles[x][y] != None):
-				if (tiles[x][y].getValue() >= 2048):
-					return True
+	""" Definit si le joueur a gagné ou non """
+	for tile in getTileList():
+		if (tile.getValue() >= 2048):
+			return True
 	return False
 
 def loose():
-	print("LOST")
+	""" Affiche l'écran de fin """
 	display()
 	screen.blit(pygame.image.load("../img/lost.png"), (0,0))
 	pygame.display.flip()
-	# TODO : aff les scores
 	while True:
 		event = pygame.event.poll()
 		if event.type == pygame.QUIT:
 			sys.exit()
+		if event.type == pygame.KEYDOWN:
+			if event.key == 8:
+				return Back()
 
 def newRandomTile():
+	""" Fait apparaitre une nouvelle tuile
+	et check si on perd """
 	# random.randrange(0,4) => 0,1,2,3
-	# TODO : check if grid is full
 	x = random.randrange(0,4)
 	y = random.randrange(0,4)
 	while tiles[x][y] != None :
@@ -74,19 +98,9 @@ def newRandomTile():
 				return
 	loose()
 
-#--- Fall functions  TODO yanis/maxence
-"""
-Fonctionnement : Pour chaque tuile, calcule l'écart entre la pos finale et initiale
-et la fait tomber à une certaine vitesse pour que tous les tuiles arrivent
-en même temps.
-Puis, on affiche directement la nouvelle grille
-/!\
-Galère, on les fait tous tomber à la même vitesse avec des check
-d'arret individuel
-En fait nn c'ests chiant aussi
-re à la méthode prévue
-"""
 def getFallDistance(arg):
+	""" Retourne la distance de chute
+	en fonction des tuiles sur la route """
 	result = 0
 	last = None
 	for tile in arg:
@@ -102,6 +116,8 @@ def getFallDistance(arg):
 	return result
 
 def getTileList():
+	""" Retourne une liste des tuiles
+	dans une liste unidimentionelle """
 	result = []
 	for x in range(0,4):
 		for y in range(0,4):
@@ -110,17 +126,25 @@ def getTileList():
 	return result
 
 def setLastGrid(grid):
+	""" sauvegarde la grille indiquée
+	comme la grille du dernier tour """
 	for x in range(0, 4):
 		for y in range(0,4):
 			lastGrid[x][y] = grid[x][y]
 
 def setGrid(grid, pos, t):
+	""" Remplace l'élément de la grille indiquée
+	à l'index indiquée par l'élément indiqué """
 	grid[pos[0]][pos[1]] = t
 
 def getGrid(grid, pos):
+	""" retourne la valeure dans l'indexe indiqué
+	de la grille indiquée """
 	return grid[pos[0]][pos[1]]
 
 def setTiles(grid):
+	""" Remplace la grille principale 
+	par la grille indiquée """
 	x = 0
 	while x < 4:
 		y = 0
@@ -130,6 +154,8 @@ def setTiles(grid):
 		x += 1
 
 def fall(direction):
+	""" Fais tomber les tuiles 
+	dans la direction indiquée """
 	speed = 25
 	tilesOnWay = []
 	newList = [[None for x in range(4)] for y in range(4)]
@@ -139,6 +165,9 @@ def fall(direction):
 	i = 0
 	x = 0
 	
+	""" Definission d'une vitesse et de la position finale
+ 	des tuiles individuellement """
+
 	if direction == "right":
 		for x in range(0,4):
 			for y in range(0,4):
@@ -187,6 +216,8 @@ def fall(direction):
 				tiles[x][y].finalPos((x, y - getFallDistance(tilesOnWay)))
 				tiles[x][y].setSpeed((0, -getFallDistance(tilesOnWay)))
 
+	""" Definition de la nouvelle grille ( après le mouvement ) """
+
 	lastScore[0] = score[0]
 	for t in liste:
 		if (getGrid(newList, t.finalPos()) != None):
@@ -203,6 +234,7 @@ def fall(direction):
 
 	setLastGrid(tiles)
 
+	# Animation
 	time = 1
 	while time < 155 : 
 		display(time)
@@ -212,7 +244,6 @@ def fall(direction):
 	setTiles(newList)
 	score[0] = newScore
 	return True
-
 
 def right():
 	return fall("right")
@@ -224,17 +255,21 @@ def down():
 	return fall("down")
 
 def NewGame():
+	""" Réinitialise la partie """
 	setTiles([[None for x in range(4)] for y in range(4)])
 	score = 0
+	GameBeginTime[0] = time.time()
 	return True
 	
 def Back():
+	""" Retour arrière """
 	setTiles(lastGrid)
 	score[0] = lastScore[0]
 	display()
 	return False
 
 def play():
+	""" Gère les évenements """
 	keyEvents = {
 				 	273:up,
 					274:down,
@@ -244,6 +279,7 @@ def play():
 					8:Back
 				}
 	while True:
+		display()
 		event = pygame.event.poll()
 		if event.type == pygame.QUIT:
 			sys.exit()
@@ -267,6 +303,8 @@ tiles = [[None for x in range(4)] for y in range(4)]
 lastGrid = [[None for x in range(4)] for y in range(4)]
 score = [0]
 lastScore = [0]
+
+GameBeginTime = [time.time()]
 
 if (not pygame.display):
 	print("Error during window creation")
